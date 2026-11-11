@@ -26,7 +26,7 @@ Route::post('/login', [AuthController::class, 'login']);
 // Đăng xuất
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
-// Nhóm yêu cầu đăng nhập chung (Member + Admin)
+// Nhóm yêu cầu đăng nhập chung (Member + Admin) - Sử dụng tiền tố /my-posts
 Route::middleware(['auth'])->group(function () {
     // Quản lý bài viết cá nhân
     Route::get('/my-posts', [PostController::class, 'index'])->name('posts.index');
@@ -45,20 +45,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/posts/{post}/comments', [CommentController::class, 'store'])->name('comments.store');
 });
 
-// Nhóm yêu cầu quyền quản trị Admin
-Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-});
-
-Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-
-    // Quản lý danh mục
-    Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index');
-    Route::post('/categories', [CategoryController::class, 'store'])->name('categories.store');
-    Route::delete('/categories/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy');
-});
-
+// Nhóm quản trị Admin
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 

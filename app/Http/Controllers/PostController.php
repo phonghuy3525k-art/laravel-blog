@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\Tag;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log; // <-- 1. Thêm dòng khai báo Log ở đầu file
 use Illuminate\Support\Str;
 
 class PostController extends Controller
@@ -63,6 +64,9 @@ class PostController extends Controller
             $post->tags()->attach($request->tags);
         }
 
+        // 2. Ghi log sự kiện tạo bài viết thành công
+        Log::info('Bài viết mới đã được tạo thành công. ID: ' . $post->id . ' bởi User ID: ' . Auth::id());
+
         return redirect()->route('posts.index')->with('success', 'Tạo bài viết thành công!');
     }
 
@@ -71,6 +75,8 @@ class PostController extends Controller
     {
         // Chặn bảo mật ở Server (Nhóm B)
         if ($post->user_id !== Auth::id()) {
+            // Ghi log cảnh báo cố tình truy cập trái phép
+            Log::warning('Cảnh báo bảo mật: User ID ' . Auth::id() . ' cố gắng chỉnh sửa bài viết không thuộc sở hữu (Post ID: ' . $post->id . ')');
             abort(403, 'Bạn không có quyền chỉnh sửa bài viết này.');
         }
 
@@ -84,6 +90,7 @@ class PostController extends Controller
     {
         // Chặn bảo mật ở Server
         if ($post->user_id !== Auth::id()) {
+            Log::warning('Cảnh báo bảo mật: User ID ' . Auth::id() . ' cố gắng cập nhật bài viết không thuộc sở hữu (Post ID: ' . $post->id . ')');
             abort(403, 'Bạn không có quyền chỉnh sửa bài viết này.');
         }
 
@@ -93,14 +100,11 @@ class PostController extends Controller
             'content' => 'required',
             'status' => 'required|in:draft,published,scheduled',
             'published_at' => 'nullable|date',
-            'thumbnail' => 'nullable|image|max:2048', // Thêm validate ảnh
+            'thumbnail' => 'nullable|image|max:2048',
         ]);
 
-        $thumbnailPath = $post->thumbnail; // Giữ nguyên ảnh cũ nếu không chọn ảnh mới
+        $thumbnailPath = $post->thumbnail;
         if ($request->hasFile('thumbnail')) {
-            // (Tùy chọn) Xóa ảnh cũ trong storage nếu muốn dọn rác:
-            // if ($post->thumbnail) { \Storage::disk('public')->delete($post->thumbnail); }
-            
             $thumbnailPath = $request->file('thumbnail')->store('thumbnails', 'public');
         }
 
@@ -108,7 +112,7 @@ class PostController extends Controller
             'category_id' => $request->category_id,
             'title' => $request->title,
             'content' => $request->content,
-            'thumbnail' => $thumbnailPath, // Cập nhật đường dẫn ảnh mới
+            'thumbnail' => $thumbnailPath,
             'status' => $request->status,
             'published_at' => $request->status === 'published' ? ($post->published_at ?? now()) : $request->published_at,
         ]);
@@ -120,6 +124,9 @@ class PostController extends Controller
             $post->tags()->detach();
         }
 
+        // Ghi log cập nhật thành công
+        Log::info('Bài viết đã được cập nhật thành công. ID: ' . $post->id . ' bởi User ID: ' . Auth::id());
+
         return redirect()->route('posts.index')->with('success', 'Cập nhật bài viết thành công!');
     }
 
@@ -127,10 +134,15 @@ class PostController extends Controller
     public function destroy(Post $post)
     {
         if ($post->user_id !== Auth::id()) {
+            Log::warning('Cảnh báo bảo mật: User ID ' . Auth::id() . ' cố gắng xóa bài viết không thuộc sở hữu (Post ID: ' . $post->id . ')');
             abort(403, 'Bạn không có quyền xóa bài viết này.');
         }
 
         $post->delete(); // Soft delete
+
+        // Ghi log chuyển vào thùng rác
+        Log::info('Bài viết đã được chuyển vào thùng rác (Soft Delete). ID: ' . $post->id . ' bởi User ID: ' . Auth::id());
+
         return redirect()->route('posts.index')->with('success', 'Đã chuyển bài viết vào thùng rác.');
     }
 
@@ -151,6 +163,9 @@ class PostController extends Controller
         $post = Post::onlyTrashed()->where('id', $id)->where('user_id', Auth::id())->firstOrFail();
         $post->restore();
 
+        // Ghi log khôi phục
+        Log::info('Bài viết đã được khôi phục từ thùng rác. ID: ' . $post->id . ' bởi User ID: ' . Auth::id());
+
         return redirect()->route('posts.trash')->with('success', 'Khôi phục bài viết thành công!');
     }
 
@@ -158,8 +173,13 @@ class PostController extends Controller
     public function forceDelete($id)
     {
         $post = Post::onlyTrashed()->where('id', $id)->where('user_id', Auth::id())->firstOrFail();
+        
+        $postId = $post->id;
         $post->tags()->detach();
         $post->forceDelete();
+
+        // Ghi log xóa vĩnh viễn
+        Log::warning('Bài viết đã bị xóa vĩnh viễn (Force Delete). ID: ' . $postId . ' bởi User ID: ' . Auth::id());
 
         return redirect()->route('posts.trash')->with('success', 'Đã xóa vĩnh viễn bài viết!');
     }
